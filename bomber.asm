@@ -21,6 +21,7 @@ JetColorPtr     word         ; pointer to player0 color lookup table
 BomberSpritePtr word         ; pointer to player1 sprite lookup table
 BomberColorPtr  word         ; pointer to player1 color lookup table
 JetAnimOffset   byte         ; palyer0 sprite configura animacao 
+Random          byte         ; Random gera um numero aleatorio para posiçao do inimigo
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Define constants
@@ -48,6 +49,9 @@ Reset:
     sta BomberYPos           ; BomberYPos = 83
     lda #54
     sta BomberXPos           ; BomberXPos = 54
+    lda #%11010100
+    sta Random               ; random = $D4
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Initialize pointers to the correct lookup table addresses
@@ -224,7 +228,6 @@ EndInputCheck:
 ;; corrigir a quando o bomber desce para a tela e demora para voltar ao topo
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 UpdateBomberPosition:
-
     lda BomberYPos   ; guarda a posicao atual do YPOS, para depois comparar
     clc                 ; clear acumulador
     cmp #0            ; compara de A(Ypos) = 0
@@ -232,12 +235,9 @@ UpdateBomberPosition:
     dec BomberYPos              ; se nao é zzero decrementa a posiçao
     jmp EndPositionUpdate
 .ResetBomberPosition
-    lda #96
-    sta BomberYPos
+    jsr GetRandomBomberPos      ; chama a subrotina para gerar uma posiçao alealtoria do inimigo (bomber)
 
-EndPositionUpdate:   ; fallback for positopn to random number
-
-
+EndPositionUpdate:   ; fallback for positopn to random number\
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Loop back to start a brand new frame
@@ -263,6 +263,35 @@ SetObjectXPos subroutine
     asl                  
     sta HMP0,y 
     sta RESP0,y
+    rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Subrotina usando LFSR Linear feedback Shift Register
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Gerer LFSR aleatorio numero e 
+;; Divide o numero por 4, para limitar o tamanho do resultado e ficar dentro da
+;; campo do jogo (rio), depois adicionar + 30 pos pra direita para compensar
+;; a parte da grama da esquerda do jogo
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+GetRandomBomberPos subroutine
+    lda Random
+    asl
+    eor Random
+    asl
+    eor Random
+    asl
+    asl
+    eor Random
+    asl
+    rol Random
+    lsr             ; divide o valor por 4 usando bitshift (movendo para direita)
+    lsr
+    sta BomberXPos   ; save o numero aleatorioa na var bomberxpos
+    lda #30
+    adc BomberXPos  ; adc 30 posiscao + BomberXPOS para compensar(pular) a grama
+    sta BomberXPos
+    lda #96
+    sta BomberYPos  ; configura o Y-Posicao 
     rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
