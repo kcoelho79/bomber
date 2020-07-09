@@ -111,7 +111,21 @@ StartFrame:
     sta VBLANK               ; turn off VBLANK
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Display the 192 visible scanlines of our main game
+;; Display the scoreboard lines - 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    lda #0              ; limpa o TIA register antes de cada frame
+    sta PF0
+    sta PF1
+    sta PF2
+    sta GRP0
+    sta GRP1
+    REPEAT 20
+        sta WSYNC   
+    REPEND
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Display the 96 visible scanlines of our main game (because 2-line kernel)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 GameVisibleLine:
     lda #$84
@@ -127,7 +141,9 @@ GameVisibleLine:
     lda #0
     sta PF2                  ; setting PF2 bit pattern
 
-    ldx #96                 ; X counts the number of remaining scanlines
+    ldx #86                 ; X counts the number of remaining scanlines 
+                            ; 96 total da area (usando 2 linhas kernel)
+                            ;84 (96 - linha do display 20 = 86)
 .GameLineLoop:
 .AreWeInsideJetSprite:       ; check if should render sprite player0
     txa                      ; transfer X to A
