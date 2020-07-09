@@ -253,7 +253,30 @@ UpdateBomberPosition:
 .ResetBomberPosition
     jsr GetRandomBomberPos      ; chama a subrotina para gerar uma posiçao alealtoria do inimigo (bomber)
 
-EndPositionUpdate:   ; fallback for positopn to random number\
+EndPositionUpdate:   ; fallback for positopn to random number
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Cheque por colisao de objeto
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+CheckCollisionP0P1:
+    lda #%10000000  ; CXPPMM bit 7 detecta colisao entre p0 p1
+    bit CXPPMM      ; cheque se o bit 7 do register CXPPMM e igual register A
+    bne .CollisionP0P1  ;if collision P0 and P1 happened, game over
+    jmp CheckCollisionP0PF      ; se nao, pula para o proximo cheque
+.CollisionP0P1:
+    jsr GameOver        ; call gameover subroutine
+
+CheckCollisionP0PF:
+    lda #%10000000      ;CXP0PF bit 7 detectado, P0 e PF colindiram
+    bit CXP0FB 
+    bne .CollisionP0PF      ; if conllision P0 e PF
+    jmp EndCollisionCheck   ; se nao pula para o final cheque        
+
+.CollisionP0PF:
+    jsr GameOver
+
+EndCollisionCheck:      ; fallback
+    sta CXCLR           ; clear register colission
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Loop back to start a brand new frame
@@ -279,6 +302,15 @@ SetObjectXPos subroutine
     asl                  
     sta HMP0,y 
     sta RESP0,y
+    rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; GameOver Subroutine
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+GameOver subroutine
+    lda #$30        
+    sta COLUBK
     rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
