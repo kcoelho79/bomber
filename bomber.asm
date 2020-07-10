@@ -16,18 +16,26 @@ JetXPos         byte         ; player0 x-position
 JetYPos         byte         ; player0 y-position
 BomberXPos      byte         ; player1 x-position
 BomberYPos      byte         ; player1 y-position
+Score           byte         ; 2-digit socre stored as BCD
+Timer           byte         ; 2-digit timer stores as BCD
+Temp            byte         ; auxiliar variable to store tempor score
+OnesDigitOffset word         ; lookup table offset for the score Ones digit
+TensDigitOffset word         ; lookup table offset for the score Tens digit
 JetSpritePtr    word         ; pointer to player0 sprite lookup table
 JetColorPtr     word         ; pointer to player0 color lookup table
 BomberSpritePtr word         ; pointer to player1 sprite lookup table
 BomberColorPtr  word         ; pointer to player1 color lookup table
 JetAnimOffset   byte         ; palyer0 sprite configura animacao 
 Random          byte         ; Random gera um numero aleatorio para posiçao do inimigo
+ScoreSprite     byte         ; store the sprite bit pattern fot the score
+TimerSprite     byte         ; store the sprite bit patter for the Timer
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Define constants
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 JET_HEIGHT = 9               ; player0 sprite height (# rows in lookup table)
-BOMBER_HEIGHT = 9            ; player1 sprite height (# rows in lookup table)
+BOMBER_HEIGHT = 9             ; player1 sprite height (# rows in lookup table)
+DIGITS_HEIGHT = 5             ; scoreboard digiti height  
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Start our ROM code at memory address $F000
@@ -41,17 +49,19 @@ Reset:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Initialize RAM variables and TIA registers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    lda #68
+    sta JetXPos              ; JetXPos = 68
     lda #10
     sta JetYPos              ; JetYPos = 10
-    lda #0
-    sta JetXPos              ; JetXPos = 60
+    lda #62
+    sta BomberXPos           ; BomberXPos = 62
     lda #83
     sta BomberYPos           ; BomberYPos = 83
-    lda #54
-    sta BomberXPos           ; BomberXPos = 54
     lda #%11010100
-    sta Random               ; random = $D4
-
+    sta Random               ; Random = $D4
+    lda #0
+    sta Score                ; Score = 0
+    sta Timer                ; Timer = 0
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Initialize pointers to the correct lookup table addresses
@@ -82,19 +92,6 @@ Reset:
 StartFrame:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; calcula e executa a tarefa dentro do pre-Vnlank
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    lda JetXPos
-    ldy #0
-    jsr SetObjectXPos           ; jump (goto)
-
-    lda BomberXPos
-    ldy #1
-    jsr SetObjectXPos
-
-    sta WSYNC
-    sta HMOVE                  
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Display VSYNC and VBLANK
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
     lda #2
@@ -108,6 +105,26 @@ StartFrame:
     REPEAT 37
         sta WSYNC            ; display the 37 recommended lines of VBLANK
     REPEND
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; calcula e executa a tarefa dentro do VBlank
+;; importante: o tempo que vai levar (clock CPU) para realizas as intruçoes abaixo
+;; deve ser considerado e descontado dentro do loop REPEAT
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    lda JetXPos
+    ldy #0
+    jsr SetObjectXPos           ; jump (goto)
+
+    lda BomberXPos
+    ldy #1
+    jsr SetObjectXPos
+
+    jsr CalculationDigitOffset  ; calcula o digital scoreboard tabela
+
+    sta WSYNC
+    sta HMOVE       
+
+    lda #0
     sta VBLANK               ; turn off VBLANK
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -118,12 +135,58 @@ StartFrame:
     sta PF1
     sta PF2
     sta GRP0
-    sta GRP1
-    REPEAT 20
-        sta WSYNC   
-    REPEND
+    sta GRP1              ; reset TIA register before displaying the score
 
+    ldx #DIGITS_HEIGHT      ; start X conuter with 5 (height of digits)
+                             ; 5 pq cada numero do score é composto por 5 linhs de byte, 
+    ;a tabela de sprites dos numeros, esta na sequencao de 00,11,22,33,etc
+    ;entao para pegar o numero 3, multiplica 5x5= decima quinta linha
+.ScoreDigitLoop:
+    ldy TensDigitOffset     ; get the tens digit offset for the score
+    lda Digits,Y             ; load the bit pattern from lookup table
+    and #$F0                ; mask/remove the graphics for the one digit
+    sta ScoreSprite         ; save the score tens digit pattern in the variable
 
+    ldy OnesDigitOffset     ; get the ones digit offset for the score
+    lda Digits,Y               ; load the bit pattern from lookup table
+    and #$0F
+    ora ScoreSprite         ; merge it with the saved tens digit sprite
+    sta ScoreSprite         ; and save it
+    sta WSYNC
+    sta PF1                 ; update the playfiedl to display the Score sprite
+
+    ldy TensDigitOffset+1   ; get the left digit offset for the timer
+    lda Digits,Y            
+    and #$F0
+    sta TimerSprite         ;save the timer digits in a variable
+
+    ldy OnesDigitOffset+1   ;get the one digit offset for the timer
+    lda Digits,Y 
+    and #$0F
+    ora TimerSprite
+    sta TimerSprite
+
+    jsr Sleep12Cyles        ; waste some cycles
+
+    sta PF1                  ; update the playfiesl for timer display
+
+    ldy ScoreSprite          ; preload for the next scanline
+    sta WSYNC
+
+    sty PF1
+    inc TensDigitOffset
+    inc TensDigitOffset+1
+    inc OnesDigitOffset
+    inc OnesDigitOffset+1     ; increment all digits for the next line of data
+
+    jsr Sleep12Cyles        ; waste some cycles
+
+    dex                     ; X--
+    sta PF1
+    bne .ScoreDigitLoop     ; if dex != 0, then branch to ScoreDigitLoop
+
+    sta WSYNC
+    
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Display the 96 visible scanlines of our main game (because 2-line kernel)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -237,8 +300,6 @@ CheckP0Right:
 
 EndInputCheck:
 
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; atualizaçao da posicao do inimigo plaeyr1 proximo frame da tela
 ;; corrigir a quando o bomber desce para a tela e demora para voltar ao topo
@@ -307,7 +368,6 @@ SetObjectXPos subroutine
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; GameOver Subroutine
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 GameOver subroutine
     lda #$30        
     sta COLUBK
@@ -340,11 +400,162 @@ GetRandomBomberPos subroutine
     sta BomberXPos
     lda #96
     sta BomberYPos  ; configura o Y-Posicao 
+
+    rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Subroutine to handle scorteboard digits to be displayd on the screen
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; convert the high and low nibbles of the variable score and timer
+;; into offset of digits lookup tables so the value can be displayed
+;; each digit has a height of 5 bytes in the lookup table
+;;
+;; for the low nibble we need multiple by 5
+;;  - we can use left shift to perfome multiplication by 2
+;;  - for any number N, the value of N*5 = (n*2*2)+N each operation shift left multiplica 2
+;;   
+;; for the upper nibble, since its already times 16, we need to divide it
+;; and then multiply by 5:
+;;   - we can use right shifts to perfom division by 2
+;;   - for any number N, the value of (n/16)*5 = (n/2/2)+(n/2/2/2/2)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+CalculationDigitOffset subroutine
+    ldx #1          ; x register is the loop counter
+.PrepareScoreLoop   ; this will loop twice, first X=1, and then X=0
+
+    lda Score,X             ; load A with timer (x=1) or Score (X=0)
+    and #$0F                ;remove de tens digits by maksinh 4 bits 00001111 (usa 4 ultimos bits)
+    sta Temp                ; save the value of A int temp
+    asl                     ; shift left (it is now N*2)
+    asl                     ; shift left (it is now N*4)
+    adc Temp                ; add the value saved in temp (+N)
+    sta OnesDigitOffset,X   ; save A in OneDigitOffset+1 or OneDigitOffSet
+
+    lda Score,X     ; load a with Timer (X=1) or Socre (X=0)
+    and #$F0        ; remove the one digit by masking 4 bits 11110000
+    lsr             ; shift right (it is now N/2)
+    lsr             ; shift right (it is now N/4)
+    sta Temp        ; save the value of A into Temp
+    lsr             ; shift right (it is now N/8)
+    lsr             ; shift right (it is now N/16)
+    adc Temp        ; add value saved in Temp (N/16 + N/4)
+    sta TensDigitOffset,X  ; store A in TensDigitOffset+1 or TensDigitOffset
+
+    dex             ; X--
+    bpl .PrepareScoreLoop ; while x >= ), loop to pass a secondd time
+    rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Subroutine to waste 12 cycles
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; jsr takes 6 cycles
+;; rts takes 6 cycles
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Sleep12Cyles subroutine
     rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Declare ROM lookup tables
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Digits:
+    .byte %01110111          ; ### ###
+    .byte %01010101          ; # # # #
+    .byte %01010101          ; # # # #
+    .byte %01010101          ; # # # #
+    .byte %01110111          ; ### ###
+
+    .byte %00010001          ;   #   #
+    .byte %00010001          ;   #   #
+    .byte %00010001          ;   #   #
+    .byte %00010001          ;   #   #
+    .byte %00010001          ;   #   #
+
+    .byte %01110111          ; ### ###
+    .byte %00010001          ;   #   #
+    .byte %01110111          ; ### ###
+    .byte %01000100          ; #   #
+    .byte %01110111          ; ### ###
+
+    .byte %01110111          ; ### ###
+    .byte %00010001          ;   #   #
+    .byte %00110011          ;  ##  ##
+    .byte %00010001          ;   #   #
+    .byte %01110111          ; ### ###
+
+    .byte %01010101          ; # # # #
+    .byte %01010101          ; # # # #
+    .byte %01110111          ; ### ###
+    .byte %00010001          ;   #   #
+    .byte %00010001          ;   #   #
+
+    .byte %01110111          ; ### ###
+    .byte %01000100          ; #   #
+    .byte %01110111          ; ### ###
+    .byte %00010001          ;   #   #
+    .byte %01110111          ; ### ###
+
+    .byte %01110111          ; ### ###
+    .byte %01000100          ; #   #
+    .byte %01110111          ; ### ###
+    .byte %01010101          ; # # # #
+    .byte %01110111          ; ### ###
+
+    .byte %01110111          ; ### ###
+    .byte %00010001          ;   #   #
+    .byte %00010001          ;   #   #
+    .byte %00010001          ;   #   #
+    .byte %00010001          ;   #   #
+
+    .byte %01110111          ; ### ###
+    .byte %01010101          ; # # # #
+    .byte %01110111          ; ### ###
+    .byte %01010101          ; # # # #
+    .byte %01110111          ; ### ###
+
+    .byte %01110111          ; ### ###
+    .byte %01010101          ; # # # #
+    .byte %01110111          ; ### ###
+    .byte %00010001          ;   #   #
+    .byte %01110111          ; ### ###
+
+    .byte %00100010          ;  #   #
+    .byte %01010101          ; # # # #
+    .byte %01110111          ; ### ###
+    .byte %01010101          ; # # # #
+    .byte %01010101          ; # # # #
+
+    .byte %01110111          ; ### ###
+    .byte %01010101          ; # # # #
+    .byte %01100110          ; ##  ##
+    .byte %01010101          ; # # # #
+    .byte %01110111          ; ### ###
+
+    .byte %01110111          ; ### ###
+    .byte %01000100          ; #   #
+    .byte %01000100          ; #   #
+    .byte %01000100          ; #   #
+    .byte %01110111          ; ### ###
+
+    .byte %01100110          ; ##  ##
+    .byte %01010101          ; # # # #
+    .byte %01010101          ; # # # #
+    .byte %01010101          ; # # # #
+    .byte %01100110          ; ##  ##
+
+    .byte %01110111          ; ### ###
+    .byte %01000100          ; #   #
+    .byte %01110111          ; ### ###
+    .byte %01000100          ; #   #
+    .byte %01110111          ; ### ###
+
+    .byte %01110111          ; ### ###
+    .byte %01000100          ; #   #
+    .byte %01100110          ; ##  ##
+    .byte %01000100          ; #   #
+    .byte %01000100          ; #   #
+
+
+
 JetSprite:
     .byte #%00000000         ;
     .byte #%00010100         ;   # #
