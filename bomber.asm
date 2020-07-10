@@ -59,8 +59,9 @@ Reset:
     sta BomberYPos           ; BomberYPos = 83
     lda #%11010100
     sta Random               ; Random = $D4
-    lda #0
+    lda #4
     sta Score                ; Score = 0
+    lda #8
     sta Timer                ; Timer = 0
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -130,54 +131,55 @@ StartFrame:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Display the scoreboard lines - 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    lda #0              ; limpa o TIA register antes de cada frame
-    sta PF0
-    sta PF1
-    sta PF2
-    sta GRP0
+    lda #0                ; limpa o TIA register antes de cada frame
+    sta PF0               ; reset TIA register before displaying the score    
+    sta PF1               ; reset TIA register before displaying the score
+    sta PF2               ; reset TIA register before displaying the score
+    sta GRP0              ; reset TIA register before displaying the score
     sta GRP1              ; reset TIA register before displaying the score
+    sta CTRLPF            ; reset TIA register before displaying the score  
 
-    ldx #DIGITS_HEIGHT      ; start X conuter with 5 (height of digits)
-                             ; 5 pq cada numero do score é composto por 5 linhs de byte, 
+    ldx #DIGITS_HEIGHT    ; start X conuter with 5 (height of digits)
+                          ; 5 pq cada numero do score é composto por 5 linhs de byte, 
     ;a tabela de sprites dos numeros, esta na sequencao de 00,11,22,33,etc
     ;entao para pegar o numero 3, multiplica 5x5= decima quinta linha
 .ScoreDigitLoop:
-    ldy TensDigitOffset     ; get the tens digit offset for the score
-    lda Digits,Y             ; load the bit pattern from lookup table
-    and #$F0                ; mask/remove the graphics for the one digit
-    sta ScoreSprite         ; save the score tens digit pattern in the variable
+    ldy TensDigitOffset   ; get the tens digit offset for the score
+    lda Digits,Y          ; load the bit pattern from lookup table
+    and #$F0              ; mask/remove the graphics for the one digit
+    sta ScoreSprite       ; save the score tens digit pattern in the variable
 
-    ldy OnesDigitOffset     ; get the ones digit offset for the score
-    lda Digits,Y               ; load the bit pattern from lookup table
+    ldy OnesDigitOffset   ; get the ones digit offset for the score
+    lda Digits,Y          ; load the bit pattern from lookup table
     and #$0F
-    ora ScoreSprite         ; merge it with the saved tens digit sprite
-    sta ScoreSprite         ; and save it
+    ora ScoreSprite       ; merge it with the saved tens digit sprite
+    sta ScoreSprite       ; and save it
     sta WSYNC
-    sta PF1                 ; update the playfiedl to display the Score sprite
+    sta PF1               ; update the playfiedl to display the Score sprite
 
-    ldy TensDigitOffset+1   ; get the left digit offset for the timer
+    ldy TensDigitOffset+1 ; get the left digit offset for the timer
     lda Digits,Y            
     and #$F0
-    sta TimerSprite         ;save the timer digits in a variable
+    sta TimerSprite       ;save the timer digits in a variable
 
-    ldy OnesDigitOffset+1   ;get the one digit offset for the timer
+    ldy OnesDigitOffset+1 ;get the one digit offset for the timer
     lda Digits,Y 
     and #$0F
     ora TimerSprite
     sta TimerSprite
 
-    jsr Sleep12Cyles        ; waste some cycles
+    jsr Sleep12Cyles      ; waste some cycles
 
-    sta PF1                  ; update the playfiesl for timer display
+    sta PF1               ; update the playfiesl for timer display
 
-    ldy ScoreSprite          ; preload for the next scanline
+    ldy ScoreSprite       ; preload for the next scanline
     sta WSYNC
 
     sty PF1
     inc TensDigitOffset
     inc TensDigitOffset+1
     inc OnesDigitOffset
-    inc OnesDigitOffset+1     ; increment all digits for the next line of data
+    inc OnesDigitOffset+1   ; increment all digits for the next line of data
 
     jsr Sleep12Cyles        ; waste some cycles
 
@@ -186,7 +188,7 @@ StartFrame:
     bne .ScoreDigitLoop     ; if dex != 0, then branch to ScoreDigitLoop
 
     sta WSYNC
-    
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Display the 96 visible scanlines of our main game (because 2-line kernel)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
