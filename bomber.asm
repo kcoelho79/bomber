@@ -277,7 +277,6 @@ GameVisibleLine:
     lda #0
     sta VBLANK               ; turn off VBLANK
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Processa entrada jpoustick do player0
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -337,24 +336,16 @@ EndPositionUpdate:   ; fallback for positopn to random number
 ;; Cheque por colisao de objeto
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 CheckCollisionP0P1:
-    lda #%10000000  ; CXPPMM bit 7 detecta colisao entre p0 p1
-    bit CXPPMM      ; cheque se o bit 7 do register CXPPMM e igual register A
-    bne .CollisionP0P1  ;if collision P0 and P1 happened, game over
-    jmp CheckCollisionP0PF      ; se nao, pula para o proximo cheque
-.CollisionP0P1:
-    jsr GameOver        ; call gameover subroutine
+    lda #%10000000              ; CXPPMM bit 7 detecta colisao entre p0 p1
+    bit CXPPMM                  ; cheque se o bit 7 do register CXPPMM e igual register A
+    bne .P0P1Collided           ; if collision P0 and P1 happened, game over
+    jsr SetTerrainRiverColor    ; else, set playfield color to green/blue
+    jmp EndCollisionCheck       ; else, skip to next check
+.P0P1Collided:
+    jsr GameOver                ; call gameover subroutine
 
-CheckCollisionP0PF:
-    lda #%10000000      ;CXP0PF bit 7 detectado, P0 e PF colindiram
-    bit CXP0FB 
-    bne .CollisionP0PF      ; if conllision P0 e PF
-    jmp EndCollisionCheck   ; se nao pula para o final cheque        
-
-.CollisionP0PF:
-    jsr GameOver
-
-EndCollisionCheck:      ; fallback
-    sta CXCLR           ; clear register colission
+EndCollisionCheck:              ; fallback
+    sta CXCLR                   ; clear register colission
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Loop back to start a brand new frame
@@ -362,11 +353,21 @@ EndCollisionCheck:      ; fallback
     jmp StartFrame           ; continue to display the next frame
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Subrotina para configurar a cor do playfiled (terreno e lago)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+SetTerrainRiverColor subroutine
+    lda #$C2
+    sta TerrainColor           ; set color to green
+    lda #$84
+    sta RiverColor              ; set river color to blue
+    rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Subrotina para configurar posicao horizontal de um objeto com ajuste fino
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; A é a posiçao coordenada x do alvo, em pixel de nosso objeto
 ;; Y e o tipo de objeto (0: player 0, 1:player1, 2:missel0, 3:missel1, 4:bola)
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 SetObjectXPos subroutine
     sta WSYNC           ; inicia um nova scanline
     sec                 ; ativa set carry para realizar subtração
