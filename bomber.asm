@@ -61,9 +61,8 @@ Reset:
     sta BomberYPos           ; BomberYPos = 83
     lda #%11010100
     sta Random               ; Random = $D4
-    lda #4
+    lda #0
     sta Score                ; Score = 0
-    lda #8
     sta Timer                ; Timer = 0
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -287,7 +286,7 @@ CheckP0Up:
     bit SWCHA                   ; compara os bits do registrador SWACH com 00001000
     bne CheckP0Down             ; se bit pattern nao for igual, vai para o proximo teste
     inc JetYPos
-    lda #0                    ; 0
+    lda #0                      ; 0
     sta JetAnimOffset           ; reset srpite animation offset para primeiro frame
 
 CheckP0Down:
@@ -295,13 +294,14 @@ CheckP0Down:
     bit SWCHA
     bne CheckP0Left
     dec JetYPos
-    lda #0                    ; 0
+    lda #0                      ; 0
     sta JetAnimOffset           ; reset srpite animation offset para primeiro frame
 
 CheckP0Left:
     lda #%01000000              ;player joystick left
     bit SWCHA
-    bne CheckP0Right
+    bne CheckP0Right            ; else
+    lda #%10000000              
     dec JetXPos
     lda JET_HEIGHT              ; 9
     sta JetAnimOffset           ; set animation offset para segundo frame
@@ -323,12 +323,14 @@ EndInputCheck:
 UpdateBomberPosition:
     lda BomberYPos   ; guarda a posicao atual do YPOS, para depois comparar
     clc                 ; clear acumulador
-    cmp #0            ; compara de A(Ypos) = 0
-    bmi .ResetBomberPosition    ; bmi(compara valor e negatio) se for < 0 entao reset position para o topo
+    cmp #0            ; compara se A(Ypos) = 0
+    bmi .ResetBomberPosition    ; bmi(compara valor se e negativo) se for < 0 entao reset position para o topo
     dec BomberYPos              ; se nao é zzero decrementa a posiçao
     jmp EndPositionUpdate
 .ResetBomberPosition
     jsr GetRandomBomberPos      ; chama a subrotina para gerar uma posiçao alealtoria do inimigo (bomber)
+    inc Score                   ; Score ++
+    inc Timer                   ; Timer ++
 
 EndPositionUpdate:   ; fallback for positopn to random number
 
