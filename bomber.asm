@@ -29,6 +29,8 @@ JetAnimOffset   byte         ; palyer0 sprite configura animacao
 Random          byte         ; Random gera um numero aleatorio para posiçao do inimigo
 ScoreSprite     byte         ; store the sprite bit pattern fot the score
 TimerSprite     byte         ; store the sprite bit patter for the Timer
+TerrainColor    byte         ; store the color of the terrain
+RiverColor      byte         ; store the color of the river
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Define constants
@@ -103,7 +105,7 @@ StartFrame:
     REPEND
     lda #0
     sta VSYNC                ; turn off VSYNC
-    REPEAT 37
+    REPEAT 31
         sta WSYNC            ; display the 37 recommended lines of VBLANK
     REPEND
 
@@ -132,13 +134,16 @@ StartFrame:
 ;; Display the scoreboard lines - 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     lda #0                ; limpa o TIA register antes de cada frame
+    sta COLUBK            ; reset TIA register before displaying the score 
     sta PF0               ; reset TIA register before displaying the score    
     sta PF1               ; reset TIA register before displaying the score
     sta PF2               ; reset TIA register before displaying the score
     sta GRP0              ; reset TIA register before displaying the score
     sta GRP1              ; reset TIA register before displaying the score
-    sta CTRLPF            ; reset TIA register before displaying the score  
-
+    sta CTRLPF
+    
+    lda #$1E
+    sta COLUPF            ; set the scoreboard playfield color with yellow
     ldx #DIGITS_HEIGHT    ; start X conuter with 5 (height of digits)
                           ; 5 pq cada numero do score é composto por 5 linhs de byte, 
     ;a tabela de sprites dos numeros, esta na sequencao de 00,11,22,33,etc
@@ -189,14 +194,24 @@ StartFrame:
 
     sta WSYNC
 
+    lda #0
+    sta PF0
+    sta PF1
+    sta PF2
+    sta WSYNC               ; padding do Score
+    sta WSYNC
+    sta WSYNC
+    
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Display the 96 visible scanlines of our main game (because 2-line kernel)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 GameVisibleLine:
-    lda #$84
-    sta COLUBK               ; set background/river color to blue
-    lda #$C2
-    sta COLUPF               ; set playfield/grass color to green
+    lda TerrainColor
+    sta COLUPF               ; set playfield/grass color 
+
+    lda RiverColor
+    sta COLUBK               ; set background/river color 
+    
     lda #%00000001
     sta CTRLPF               ; enable playfield reflection
     lda #$F0
@@ -206,7 +221,7 @@ GameVisibleLine:
     lda #0
     sta PF2                  ; setting PF2 bit pattern
 
-    ldx #86                 ; X counts the number of remaining scanlines 
+    ldx #85                 ; X counts the number of remaining scanlines 
                             ; 96 total da area (usando 2 linhas kernel)
                             ;84 (96 - linha do display 20 = 86)
 .GameLineLoop:
@@ -372,7 +387,10 @@ SetObjectXPos subroutine
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 GameOver subroutine
     lda #$30        
-    sta COLUBK
+    sta TerrainColor            ; set terrain collor to red
+    sta RiverColor              ; set river color to red
+    lda #0
+    sta Score                   ; score = 0
     rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
