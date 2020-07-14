@@ -52,9 +52,9 @@ Reset:
 ;; Initialize RAM variables and TIA registers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     lda #68
-    sta JetXPos              ; JetXPos = 68
+    sta JetXPos              ; JetXPos = limite 0 a 103
     lda #10
-    sta JetYPos              ; JetYPos = 10
+    sta JetYPos              ; JetYPos = Limite 0 a 77
     lda #62
     sta BomberXPos           ; BomberXPos = 62
     lda #83
@@ -285,7 +285,10 @@ CheckP0Up:
     lda #%00010000              ; player0 joystick pra cima
     bit SWCHA                   ; compara os bits do registrador SWACH com 00001000
     bne CheckP0Down             ; se bit pattern nao for igual, vai para o proximo teste
-    inc JetYPos
+    lda JetYPos
+    cmp #77                     ; compara se player0 = 77
+    beq CheckP0Down             ;      entao vai para proxima sequencia
+    inc JetYPos                 ;       se nao : incremente Y posicao
     lda #0                      ; 0
     sta JetAnimOffset           ; reset srpite animation offset para primeiro frame
 
@@ -293,6 +296,9 @@ CheckP0Down:
     lda #%00100000              ;player joystick baixo
     bit SWCHA
     bne CheckP0Left
+    lda JetYPos
+    cmp #0  
+    beq CheckP0Left
     dec JetYPos
     lda #0                      ; 0
     sta JetAnimOffset           ; reset srpite animation offset para primeiro frame
@@ -301,8 +307,10 @@ CheckP0Left:
     lda #%01000000              ;player joystick left
     bit SWCHA
     bne CheckP0Right            ; else
-    lda #%10000000              
-    dec JetXPos
+    lda JetXPos
+    cmp #30                     ; compare if Play0 X Position = 35 :
+    beq CheckP0Right            ;   then skip decrement
+    dec JetXPos                 ;   else decrement X position
     lda JET_HEIGHT              ; 9
     sta JetAnimOffset           ; set animation offset para segundo frame
 
@@ -310,6 +318,9 @@ CheckP0Right:
     lda #%10000000              ;player joystick direita
     bit SWCHA
     bne EndInputCheck
+    lda JetXPos
+    cmp #103
+    beq EndInputCheck
     inc JetXPos
     lda JET_HEIGHT              ; 9
     sta JetAnimOffset           ; set animation offset para segundo frame
@@ -329,8 +340,19 @@ UpdateBomberPosition:
     jmp EndPositionUpdate
 .ResetBomberPosition
     jsr GetRandomBomberPos      ; chama a subrotina para gerar uma posiçao alealtoria do inimigo (bomber)
-    inc Score                   ; Score ++
-    inc Timer                   ; Timer ++
+    
+.SetScoreValues:
+    sed                         ; activate decimal mode for score and timer values
+                                ; BCD ativo nao funciona usando INC (incremeto), usar ADC (adicionar)
+    lda Score
+    clc                         ; utilizar CLC sempre que tiver operaçao de ADC, SBC.. para resultados -127 ou +127
+    adc #1                      ; add 1 to the Score
+    sta Score                   ; Salva
+    lda Timer
+    clc
+    adc #1
+    sta Timer
+    cld                         ; disable BCD after updateing Score and Timer
 
 EndPositionUpdate:   ; fallback for positopn to random number
 
